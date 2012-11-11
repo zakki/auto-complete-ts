@@ -1,6 +1,5 @@
-///<reference path='..\typescript\src\harness\harness.ts'/>
-///<reference path='..\typescript\src\harness\baselining.ts'/>
-///<reference path='..\typescript\src\harness\external\json2.ts'/>
+///<reference path='harness.ts'/>
+///<reference path='external\json2.ts'/>
 ///<reference path='..\typescript\src\compiler\optionsParser.ts'/>
 
 class Isense {

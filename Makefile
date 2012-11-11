@@ -6,15 +6,6 @@ CSRC=$(BASE)src/compiler
 #compiler services source location
 SSRC=$(BASE)src/services
 
-#library source location
-LSRC=$(BASE)typings
-
-#test source location
-TSRC=$(BASE)test
-
-# harness source location
-HSRC=$(BASE)src/harness
-
 # STRC_LOCAL=$(HOST) $(BUILT_LOCAL)/tsc.js -cflowu 
 # STRC_LKG=$(HOST) $(BIN)/tsc.js -cflowu 
 STRC_LOCAL=tsc -cflowu
@@ -107,6 +98,6 @@ SERVICES_SOURCES= \
 
 all:
 #	$(STRC_LOCAL) -noresolve -target es5 $(SERVICES_SOURCES) $(CSRC)/io.ts $(CSRC)/optionsParser.ts $(HSRC)/exec.ts  $(HSRC)/diff.ts $(HSRC)/harness.ts $(HSRC)/baselining.ts $(HSRC)/external/json2.ts dumper.ts -out dumper.js
-	$(STRC_LOCAL) -noresolve -target es5 $(SERVICES_SOURCES) $(CSRC)/io.ts $(CSRC)/optionsParser.ts $(HSRC)/exec.ts  $(HSRC)/diff.ts $(HSRC)/harness.ts $(HSRC)/baselining.ts $(HSRC)/external/json2.ts isense.ts -out isense.js
+	$(STRC_LOCAL) -noresolve -target es5 $(SERVICES_SOURCES) $(CSRC)/io.ts $(CSRC)/optionsParser.ts exec.ts harness.ts external/json2.ts isense.ts -out isense.js
 
 # $(HSRC)/baselining.ts $(HSRC)/dumpAST-baselining.ts $(HSRC)/external/json2.ts $(HSRC)/runner.ts -out $(BUILT_LOCALTEST)/run.js
