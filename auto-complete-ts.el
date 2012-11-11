@@ -49,6 +49,9 @@
 
 (defconst ac-ts-error-buffer-name "*ts error*")
 
+(defvar ac-ts-dir (file-name-directory load-file-name)
+  "The root dir of the auto-complete-ts distribution.")
+
 (defun ac-ts-parse-output (prefix)
   (message "ac-ts-parse-output")
   (goto-char (point-min))
@@ -102,13 +105,15 @@
   (save-excursion
     (goto-char pos)
     (list "--line" (format "%d" (line-number-at-pos))
-		  "--col" (format "%d" (1+ (- (point) (line-beginning-position)))))))
+		  "--col" (format "%d" (1+ (- (point) (line-beginning-position))))
+		  "--libdir" (expand-file-name ac-ts-lib-dir)
+		  )))
 
 (defsubst ac-ts-build-complete-args (pos)
-  (append (list (expand-file-name "~/ts/emacs/isense.js"))
+  (append (list (expand-file-name (concat ac-ts-dir "/isense.js")))
 		  (ac-ts-build-location pos)
           (list (if ac-ts-auto-save buffer-file-name "-")
-				(if ac-ts-lib-dir (expand-file-name (concat ac-ts-lib-dir "/lib.d.ts"))))))
+				)))
 
 (defface ac-ts-candidate-face
   '((t (:background "lightgray" :foreground "navy")))
