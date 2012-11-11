@@ -60,7 +60,12 @@
 		 (member-entries (cdr (assoc 'entries member)))
 		 (nomember (cdr (assoc 'nomember json-object)))
 		 (nomember-entries (cdr (assoc 'entries nomember))))
-	(mapcar (lambda (ent) (cdr (assoc 'name ent)))
+	(mapcar (lambda (ent)
+			  (let ((name (cdr (assoc 'name ent)))
+					(kind (cdr (assoc 'kind ent)))
+					(type (cdr (assoc 'type ent))))
+				(propertize name 'ac-ts-help
+							(concat kind ":" type))))
 			(if member-entries member-entries nomember-entries))))
 
 (defun ac-ts-handle-error (res args)
@@ -115,6 +120,14 @@
           (list (if ac-ts-auto-save buffer-file-name "-")
 				)))
 
+(defun ac-ts-document (item)
+  (if (stringp item)
+      (let (s)
+        (setq s (get-text-property 0 'ac-ts-help item))
+		s))
+  ;; (popup-item-property item 'ac-clang-help)
+  )
+
 (defface ac-ts-candidate-face
   '((t (:background "lightgray" :foreground "navy")))
   "Face for ts candidate"
@@ -153,7 +166,7 @@
     (selection-face . ac-ts-selection-face)
 	(prefix . ac-ts-prefix)
     (requires . 0)
-    ;; (document . ac-ts-document)
+	(document . ac-ts-document)
     ;; (action . ac-ts-action)
     (cache)
     (symbol . "t")))
