@@ -8,10 +8,19 @@ class Isense {
     }
 
 	public dump() {
+		var useDefaultLib: bool = true;
 		var line: number = 0;
 		var col: number = 0;
+		var libdir: string = null;
 
         var opts = new OptionsParser(this.ioHost);
+
+        opts.flag('nolib', {
+            usage: 'Do not include a default lib.d.ts with global declarations',
+            set: () => {
+                useDefaultLib = false;
+            }
+        });
 
         opts.option('line', {
             usage: 'Cursor line',
@@ -29,6 +38,14 @@ class Isense {
             }
         }, 'c');
 
+        opts.option('libdir', {
+            usage: 'Cursor column',
+            type: 'dir',
+            set: (str) => {
+                libdir = str;
+            }
+        });
+
         var printedUsage = false;
         opts.flag('help', {
             usage: 'Print this message',
@@ -43,9 +60,15 @@ class Isense {
 		var i;
 
 		// Set up the compiler
+		if (libdir) {
+			Harness.setDefaultLibraryDir(libdir);
+		}
 		var typescriptLS = new Harness.TypeScriptLS();
 		var refname = "";
 
+		if (useDefaultLib) {
+			typescriptLS.addDefaultLibrary();
+		}
         for (var i = 0; i < opts.unnamed.length; i++) {
             var file = opts.unnamed[i];
 

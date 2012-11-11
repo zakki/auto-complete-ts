@@ -30687,12 +30687,14 @@ var Harness;
 (function (Harness) {
     var global = Function("return this").call(null);
     Harness.userSpecifiedroot = "";
-    (function (Compiler) {
-        var libFolder = global['WScript'] ? TypeScript.filePath(global['WScript'].ScriptFullName) : (__dirname + '\\');
-        Compiler.libText = IO ? IO.readFile(libFolder + "lib.d.ts") : '';
-    })(Harness.Compiler || (Harness.Compiler = {}));
-    var Compiler = Harness.Compiler;
-
+    var defaultLibraryDir = "";
+    function setDefaultLibraryDir(dir) {
+        defaultLibraryDir = dir;
+    }
+    Harness.setDefaultLibraryDir = setDefaultLibraryDir;
+    function getLibText() {
+        return IO ? IO.readFile(defaultLibraryDir + "\\lib.d.ts") : '';
+    }
     (function (CollateralReader) {
         CollateralReader.root = "tests\\";
         function setRoot(newRoot) {
@@ -30774,7 +30776,7 @@ var Harness;
             this.maxScriptVersions = 100;
         }
         TypeScriptLS.prototype.addDefaultLibrary = function () {
-            this.addScript("lib.d.ts", Harness.Compiler.libText, true);
+            this.addScript("lib.d.ts", getLibText(), true);
         };
         TypeScriptLS.prototype.addFile = function (name, isResident) {
             if (typeof isResident === "undefined") { isResident = false; }
@@ -31118,9 +31120,17 @@ var Isense = (function () {
         this.ioHost = ioHost;
     }
     Isense.prototype.dump = function () {
+        var useDefaultLib = true;
         var line = 0;
         var col = 0;
+        var libdir = null;
         var opts = new OptionsParser(this.ioHost);
+        opts.flag('nolib', {
+            usage: 'Do not include a default lib.d.ts with global declarations',
+            set: function () {
+                useDefaultLib = false;
+            }
+        });
         opts.option('line', {
             usage: 'Cursor line',
             type: 'num',
@@ -31135,6 +31145,13 @@ var Isense = (function () {
                 col = parseInt(str);
             }
         }, 'c');
+        opts.option('libdir', {
+            usage: 'Cursor column',
+            type: 'dir',
+            set: function (str) {
+                libdir = str;
+            }
+        });
         var printedUsage = false;
         opts.flag('help', {
             usage: 'Print this message',
@@ -31145,8 +31162,14 @@ var Isense = (function () {
         }, 'h');
         opts.parse(this.ioHost.arguments);
         var i;
+        if(libdir) {
+            Harness.setDefaultLibraryDir(libdir);
+        }
         var typescriptLS = new Harness.TypeScriptLS();
         var refname = "";
+        if(useDefaultLib) {
+            typescriptLS.addDefaultLibrary();
+        }
         for(var i = 0; i < opts.unnamed.length; i++) {
             var file = opts.unnamed[i];
             var filenameIndex = file.lastIndexOf('\\');

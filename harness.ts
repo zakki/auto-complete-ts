@@ -11,11 +11,14 @@ declare var __dirname; // Node-specific
 module Harness {
     var global = <any>Function("return this").call(null);
     export var userSpecifiedroot = "";
+	var defaultLibraryDir = "";
 
-    // Compiles TypeScript code
-    export module Compiler {
-        var libFolder: string = global['WScript'] ? TypeScript.filePath(global['WScript'].ScriptFullName) : (__dirname + '\\');
-        export var libText = IO ? IO.readFile(libFolder + "lib.d.ts") : '';
+	export function setDefaultLibraryDir(dir: string) {
+		defaultLibraryDir = dir;
+	}
+
+    function getLibText() {
+		return IO ? IO.readFile(defaultLibraryDir + "\\lib.d.ts") : '';
 	}
 
     // Reads collateral relative to the collateral root.
@@ -100,7 +103,7 @@ module Harness {
         public maxScriptVersions = 100;
 
         public addDefaultLibrary() {
-            this.addScript("lib.d.ts", Harness.Compiler.libText, true);
+            this.addScript("lib.d.ts", getLibText(), true);
         }
 
         public addFile(name: string, isResident = false) {
