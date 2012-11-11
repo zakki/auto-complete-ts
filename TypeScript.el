@@ -474,6 +474,11 @@ getting timeout messages."
   :type 'integer
   :group 'typescript)
 
+(defcustom typescript-mode-hook nil
+  "*Hook called by `typescript-mode'."
+  :type 'hook
+  :group 'typescript)
+
 ;;; KeyMap
 
 (defvar typescript-mode-map
@@ -3338,7 +3343,10 @@ Key bindings:
   (font-lock-set-defaults)
 
   (let (font-lock-keywords) ; leaves syntactic keywords intact
-    (font-lock-fontify-buffer)))
+    (font-lock-fontify-buffer))
+
+  ;; call hook
+  (run-mode-hooks 'typescript-mode-hook))
 
 ;;;###autoload
 (eval-after-load 'folding
