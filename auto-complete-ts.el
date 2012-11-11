@@ -30,6 +30,12 @@
   :group 'auto-complete
   :type 'file)
 
+(defcustom ac-ts-lib-dir
+  nil
+  "*Location of typing files (*.d.ts) directory."
+  :group 'auto-complete
+  :type 'file)
+
 (defcustom ac-ts-auto-save t
   "*Determines whether to save the buffer when retrieving completions."
   :group 'auto-complete
@@ -101,7 +107,8 @@
 (defsubst ac-ts-build-complete-args (pos)
   (append (list (expand-file-name "~/ts/emacs/isense.js"))
 		  (ac-ts-build-location pos)
-          (list (if ac-ts-auto-save buffer-file-name "-"))))
+          (list (if ac-ts-auto-save buffer-file-name "-")
+				(if ac-ts-lib-dir (expand-file-name (concat ac-ts-lib-dir "/lib.d.ts"))))))
 
 (defface ac-ts-candidate-face
   '((t (:background "lightgray" :foreground "navy")))
@@ -129,12 +136,18 @@
              ac-prefix
              (ac-ts-build-complete-args (- (point) (length ac-prefix)))))))
 
+(defun ac-ts-prefix ()
+  (or (ac-prefix-symbol)
+      (let ((c (char-before)))
+        (when (or (eq ?\. c))
+          (point)))))
+
 (ac-define-source ts
   '((candidates . ac-ts-candidate)
     (candidate-face . ac-ts-candidate-face)
     (selection-face . ac-ts-selection-face)
-    ;; (prefix . ac-ts-prefix)
-    (requires . -1)
+	(prefix . ac-ts-prefix)
+    (requires . 0)
     ;; (document . ac-ts-document)
     ;; (action . ac-ts-action)
     (cache)
