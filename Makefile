@@ -23,6 +23,7 @@ COMPILER_SOURCES_BASE= \
   $(CSRC)/tokens.ts \
   $(CSRC)/ast.ts \
   $(CSRC)/astWalker.ts \
+  $(CSRC)/astWalkerCallback.ts \
   $(CSRC)/astPath.ts \
   $(CSRC)/astLogger.ts \
   $(CSRC)/scanner.ts \
@@ -37,6 +38,7 @@ COMPILER_SOURCES_BASE= \
   $(CSRC)/base64.ts \
   $(CSRC)/sourceMapping.ts \
   $(CSRC)/emitter.ts \
+  $(CSRC)/declarationEmitter.ts \
   $(CSRC)/precompile.ts \
   $(CSRC)/incrementalParser.ts \
   $(CSRC)/pathUtils.ts \
