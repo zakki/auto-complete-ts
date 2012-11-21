@@ -90,10 +90,9 @@ class Isense {
         var pos = lineMap[line] + (col - 1);
 
 		function parse(str: string) {
-			var m = str.match(/^{'result':(.*)}$/);
-			if (m == null)
+			if (str == null)
 				return null;
-			return JSON2.parse(m[1]);
+			return JSON2.parse(str).result;
 		}
         var info = {
 			pos: pos,
@@ -101,7 +100,7 @@ class Isense {
 			member: parse(ls.getCompletionsAtPosition(refname, pos, true)),
 			nomember: parse(ls.getCompletionsAtPosition(refname, pos, false)),
 			type: parse(ls.getTypeAtPosition(refname, pos)),
-			def: parse(ls.getDefinitionAtPosition(refname, pos)),
+			def: ls.getDefinitionAtPosition(refname, pos).split("\t"),
 		};
         this.ioHost.printLine(JSON2.stringify(info).trim());
 	}
