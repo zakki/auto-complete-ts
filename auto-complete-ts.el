@@ -52,8 +52,11 @@
 (defvar ac-ts-dir (file-name-directory load-file-name)
   "The root dir of the auto-complete-ts distribution.")
 
+(defvar ac-ts-debug-mode nil)
+
 (defun ac-ts-parse-output (prefix)
-  (message "ac-ts-parse-output")
+  (when ac-ts-debug-mode
+	(message "ac-ts-parse-output"))
   (goto-char (point-min))
   (let* ((json-object (json-read))
 		 (member (cdr (assoc 'member json-object)))
@@ -91,20 +94,17 @@
         (goto-char (point-min))))))
 
 (defun ac-ts-call-process (prefix &rest args)
-  (message "ac-ts-call-process")
+  (when ac-ts-debug-mode
+	(message "ac-ts-call-process"))
   (let ((buf (get-buffer-create "*ts-output*"))
         res)
     (with-current-buffer buf (erase-buffer))
-    (setq res (if ac-ts-auto-save
-                  (apply 'call-process ac-ts-node-executable nil buf nil args)
-                (apply 'call-process-region (point-min) (point-max)
-                       ac-ts-node-executable nil buf nil args)))
+    (setq res (apply 'call-process ac-ts-node-executable nil buf nil args))
     (with-current-buffer buf
       (unless (eq 0 res)
         (ac-ts-handle-error res args))
       ;; Still try to get any useful input.
       (ac-ts-parse-output prefix))))
-
 
 (defsubst ac-ts-build-location (pos)
   (save-excursion
@@ -114,11 +114,10 @@
 		  "--libdir" (expand-file-name ac-ts-lib-dir)
 		  )))
 
-(defsubst ac-ts-build-complete-args (pos)
-  (append (list (expand-file-name (concat ac-ts-dir "/isense.js")))
-		  (ac-ts-build-location pos)
-          (list (if ac-ts-auto-save buffer-file-name "-")
-				)))
+(defsubst ac-ts-build-complete-args (file-name pos)
+  (append (list (expand-file-name (concat ac-ts-dir "/isense.js"))
+				(expand-file-name file-name))
+		  (ac-ts-build-location pos)))
 
 (defun ac-ts-document (item)
   (if (stringp item)
@@ -143,16 +142,27 @@
   (nth 8 (syntax-ppss)))
 
 (defun ac-ts-candidate ()
-  (message "ac-ts-candidate")
+  (when ac-ts-debug-mode
+	(message "ac-ts-candidate"))
   (unless (ac-in-string/comment)
-    (and ac-ts-auto-save
-         (buffer-modified-p)
-         (basic-save-buffer))
-    (save-restriction
-      (widen)
-      (apply 'ac-ts-call-process
-             ac-prefix
-             (ac-ts-build-complete-args (- (point) (length ac-prefix)))))))
+	(let (file-name)
+	  (if ac-ts-auto-save
+		  (progn (buffer-modified-p)
+				 (basic-save-buffer)
+				 (setq file-name buffer-file-name))
+		(let ((tmp-file (make-temp-file "auto-complete-ts")))
+		  (write-region (point-min) (point-max)
+						tmp-file
+						t 1)
+		  (setq file-name tmp-file)))
+	  (prog1
+		  (save-restriction
+			(widen)
+			(apply 'ac-ts-call-process
+				   ac-prefix
+				   (ac-ts-build-complete-args file-name
+											  (- (point) (length ac-prefix)))))
+		(unless ac-ts-auto-save (delete-file file-name))))))
 
 (defun ac-ts-prefix ()
   (or (ac-prefix-symbol)
