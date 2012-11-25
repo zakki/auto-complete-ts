@@ -54,70 +54,53 @@
 
 (defvar ac-ts-debug-mode nil)
 
-(defun ac-ts-parse-output (prefix)
-  (when ac-ts-debug-mode
-	(message "ac-ts-parse-output"))
-  (goto-char (point-min))
-  (let* ((json-object (json-read))
-		 (member (cdr (assoc 'member json-object)))
-		 (member-entries (cdr (assoc 'entries member)))
-		 (nomember (cdr (assoc 'nomember json-object)))
-		 (nomember-entries (cdr (assoc 'entries nomember))))
-	(mapcar (lambda (ent)
-			  (let ((name (cdr (assoc 'name ent)))
-					(kind (cdr (assoc 'kind ent)))
-					(type (cdr (assoc 'type ent))))
-				(propertize name 'ac-ts-help
-							(concat kind ":" type))))
-			(if member-entries member-entries nomember-entries))))
+;; connect to typescript-tools
+(defvar ac-ts-proc nil)
+(defvar ac-ts-tss-result nil)
 
-(defun ac-ts-handle-error (res args)
-  (goto-char (point-min))
-  (let* ((buf (get-buffer-create ac-ts-error-buffer-name))
-         (cmd (concat ac-ts-node-executable " " (mapconcat 'identity args " ")))
-         (pattern (format ac-ts-completion-pattern ""))
-         (err (if (re-search-forward pattern nil t)
-                  (buffer-substring-no-properties (point-min)
-                                                  (1- (match-beginning 0)))
-                ;; Warn the user more agressively if no match was found.
-                (message "ts failed with error %d:\n%s" res cmd)
-                (buffer-string))))
+(defun ac-ts-ensure-tss (file-name)
+  (unless (and ac-ts-tss-proc
+			   (member (process-status ac-ts-tss-proc) '(run stop)))
+	(let ((tss (expand-file-name (concat ac-ts-dir "/../typescript-tools/tss.js")))
+		  (f (expand-file-name file-name)))
+	  (when ac-ts-debug-mode
+		(message "tss:%s\nfile:%s" tss f))
+	  (setq ac-ts-tss-proc (start-process "node tss.js"
+									  "*ac-ts-tss*"
+									  ac-ts-node-executable
+									  tss f))
+	  (set-process-filter ac-ts-tss-proc 'ac-ts-tss-proc-filter))))
 
-    (with-current-buffer buf
-      (let ((inhibit-read-only t))
-        (erase-buffer)
-        (insert (current-time-string)
-                (format "\nts failed with error %d:\n" res)
-                cmd "\n\n")
-        (insert err)
-        (setq buffer-read-only t)
-        (goto-char (point-min))))))
-
-(defun ac-ts-call-process (prefix &rest args)
-  (when ac-ts-debug-mode
-	(message "ac-ts-call-process"))
-  (let ((buf (get-buffer-create "*ts-output*"))
-        res)
-    (with-current-buffer buf (erase-buffer))
-    (setq res (apply 'call-process ac-ts-node-executable nil buf nil args))
-    (with-current-buffer buf
-      (unless (eq 0 res)
-        (ac-ts-handle-error res args))
-      ;; Still try to get any useful input.
-      (ac-ts-parse-output prefix))))
-
-(defsubst ac-ts-build-location (pos)
+(defsubst ac-ts-build-location (file-name pos)
   (save-excursion
     (goto-char pos)
-    (list "--line" (format "%d" (line-number-at-pos))
-		  "--col" (format "%d" (1+ (- (point) (line-beginning-position))))
-		  "--libdir" (expand-file-name ac-ts-lib-dir)
-		  )))
+	(format "%d %d %s"
+			(line-number-at-pos)
+			(1+ (- (point) (line-beginning-position)))
+			(expand-file-name file-name))))
 
-(defsubst ac-ts-build-complete-args (file-name pos)
-  (append (list (expand-file-name (concat ac-ts-dir "/isense.js"))
-				(expand-file-name file-name))
-		  (ac-ts-build-location pos)))
+(defsubst ac-ts-tss-query (file-name pos)
+  (concat "info " (ac-ts-build-location file-name pos) "\r\n"))
+
+(defun ac-ts-tss-proc-filter (proc string)
+  (when ac-ts-debug-mode
+	(message "ac-ts-tss-proc-filter %s" string))
+  (condition-case err
+	  (let* ((info (json-read-from-string string))
+			 (member (cdr (assoc 'completions info)))
+			 (member-entries (cdr (assoc 'entries member)))
+			 (completions (mapcar (lambda (ent)
+									(let ((name (cdr (assoc 'name ent)))
+										  (kind (cdr (assoc 'kind ent)))
+										  (type (cdr (assoc 'type ent))))
+									  (propertize name 'ac-ts-help
+												  (concat kind ":" type))))
+								  member-entries)))
+		(setq ac-ts-tss-result completions))
+	(json-error
+	 (progn
+	   (message "ac-ts error %s" (error-message-string err))
+	   (setq ac-ts-tss-result 1)))))
 
 (defun ac-ts-document (item)
   (if (stringp item)
@@ -158,10 +141,14 @@
 	  (prog1
 		  (save-restriction
 			(widen)
-			(apply 'ac-ts-call-process
-				   ac-prefix
-				   (ac-ts-build-complete-args file-name
-											  (- (point) (length ac-prefix)))))
+			(ac-ts-ensure-tss file-name)
+			(setq ac-ts-tss-result nil)
+			(process-send-string ac-ts-tss-proc (ac-ts-tss-query file-name (- (point) (length ac-prefix))))
+			(while (not ac-ts-tss-result)
+			  (sleep-for 0.1))
+			(if (listp ac-ts-tss-result)
+				ac-ts-tss-result
+			  nil))
 		(unless ac-ts-auto-save (delete-file file-name))))))
 
 (defun ac-ts-prefix ()
