@@ -55,7 +55,7 @@
 (defvar ac-ts-debug-mode nil)
 
 ;; connect to typescript-tools
-(defvar ac-ts-proc nil)
+(defvar ac-ts-tss-proc nil)
 (defvar ac-ts-tss-result nil)
 
 (defun ac-ts-ensure-tss (file-name)
@@ -79,24 +79,38 @@
 			(1+ (- (point) (line-beginning-position)))
 			(expand-file-name file-name))))
 
-(defsubst ac-ts-tss-query (file-name pos)
+(defsubst ac-ts-tss-query-command (file-name pos)
   (concat "info " (ac-ts-build-location file-name pos) "\r\n"))
 
+(defsubst ac-ts-tss-update (file-name)
+  (setq ac-ts-tss-result nil)
+  (let* ((cmd-json (list (cons "name" (expand-file-name file-name))
+						 (cons "content" (buffer-substring-no-properties (point-min) (point-max)))))
+		 (cmd (concat "update "
+					  (json-encode cmd-json)
+					  "\r\n")))
+	(process-send-string ac-ts-tss-proc cmd))
+  (while (not ac-ts-tss-result)
+	(sleep-for 0.1)))
+
 (defun ac-ts-tss-proc-filter (proc string)
-  (when ac-ts-debug-mode
-	(message "ac-ts-tss-proc-filter %s" string))
+  ;; (when ac-ts-debug-mode
+  ;; 	(message "ac-ts-tss-proc-filter %s %d"
+  ;; 			 (string  )
+  ;; 			 (length string)))
+  (with-current-buffer (process-buffer proc)
+    (let ((moving (= (point) (process-mark proc))))
+      (save-excursion
+        ;; Insert the text, advancing the process marker.
+        (goto-char (process-mark proc))
+        (insert string)
+        (set-marker (process-mark proc) (point)))
+      (if moving (goto-char (process-mark proc)))))
   (condition-case err
-	  (let* ((info (json-read-from-string string))
-			 (member (cdr (assoc 'completions info)))
-			 (member-entries (cdr (assoc 'entries member)))
-			 (completions (mapcar (lambda (ent)
-									(let ((name (cdr (assoc 'name ent)))
-										  (kind (cdr (assoc 'kind ent)))
-										  (type (cdr (assoc 'type ent))))
-									  (propertize name 'ac-ts-help
-												  (concat kind ":" type))))
-								  member-entries)))
-		(setq ac-ts-tss-result completions))
+	  (cond ((string-match "^\\(loaded\\|TSS\\) .*" string)
+			 (setq ac-ts-tss-result 1))
+			(t
+			 (setq ac-ts-tss-result (json-read-from-string string))))
 	(json-error
 	 (progn
 	   (message "ac-ts error %s" (error-message-string err))
@@ -124,6 +138,17 @@
   "Return non-nil if point is in a literal (a comment or string)."
   (nth 8 (syntax-ppss)))
 
+(defun ac-ts--get-completions (info)
+  (let* ((member (cdr (assoc 'completions info)))
+		 (member-entries (cdr (assoc 'entries member))))
+	(mapcar (lambda (ent)
+			  (let ((name (cdr (assoc 'name ent)))
+					(kind (cdr (assoc 'kind ent)))
+					(type (cdr (assoc 'type ent))))
+				(propertize name 'ac-ts-help
+							(concat kind ":" type))))
+			member-entries)))
+
 (defun ac-ts-candidate ()
   (when ac-ts-debug-mode
 	(message "ac-ts-candidate"))
@@ -142,12 +167,14 @@
 		  (save-restriction
 			(widen)
 			(ac-ts-ensure-tss file-name)
+			(ac-ts-tss-update file-name)
 			(setq ac-ts-tss-result nil)
-			(process-send-string ac-ts-tss-proc (ac-ts-tss-query file-name (- (point) (length ac-prefix))))
+			(process-send-string ac-ts-tss-proc
+								 (ac-ts-tss-query-command file-name (- (point) (length ac-prefix))))
 			(while (not ac-ts-tss-result)
 			  (sleep-for 0.1))
 			(if (listp ac-ts-tss-result)
-				ac-ts-tss-result
+				(ac-ts--get-completions ac-ts-tss-result)
 			  nil))
 		(unless ac-ts-auto-save (delete-file file-name))))))
 
