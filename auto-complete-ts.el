@@ -71,13 +71,17 @@
 									  tss f))
 	  (set-process-filter ac-ts-tss-proc 'ac-ts-tss-proc-filter))))
 
-
 (defun ac-ts--wait-response ()
   (let ((n 0)
 		(seconds 5))
     (while (and (not ac-ts-tss-result) (<= n (* 10 seconds)))
 	  (setq n (+ 1 n))
 	  (sleep-for 0.1))))
+
+(defun ac-ts-current-pos ()
+  (format "%d %d"
+		  (line-number-at-pos)
+		  (- (point) (line-beginning-position))))
 
 (defsubst ac-ts-build-location (file-name pos)
   (save-excursion
@@ -116,23 +120,28 @@
   ;; 	(message "ac-ts-tss-proc-filter %s %d"
   ;; 			 (string  )
   ;; 			 (length string)))
-  (with-current-buffer (process-buffer proc)
-    (let ((moving (= (point) (process-mark proc))))
-      (save-excursion
-        ;; Insert the text, advancing the process marker.
-        (goto-char (process-mark proc))
-        (insert string)
-        (set-marker (process-mark proc) (point)))
-      (if moving (goto-char (process-mark proc)))))
-  (condition-case err
-	  (cond ((string-match "^\\(loaded\\|reloaded\\|updated\\|TSS\\) .*" string)
-			 (setq ac-ts-tss-result 1))
-			(t
-			 (setq ac-ts-tss-result (json-read-from-string string))))
-	(json-error
-	 (progn
-	   (message "ac-ts error %s" (error-message-string err))
-	   (setq ac-ts-tss-result 1)))))
+  (let ((line))
+	(with-current-buffer (process-buffer proc)
+	  (let ((moving (= (point) (process-mark proc))))
+		(save-excursion
+		  ;; Insert the text, advancing the process marker.
+		  (goto-char (process-mark proc))
+		  (insert string)
+		  (set-marker (process-mark proc) (point))
+		  (when (= (point) (line-beginning-position))
+			(beginning-of-line 0)
+			(setq line (buffer-substring-no-properties (point) (point-at-eol)))))
+		(if moving (goto-char (process-mark proc)))))
+	(when line
+	  (condition-case err
+		  (cond ((string-match "^\\(loaded\\|reloaded\\|updated\\|TSS\\) .*" line)
+				 (setq ac-ts-tss-result 1))
+				(t
+				 (setq ac-ts-tss-result (json-read-from-string line))))
+		(json-error
+		 (progn
+		   (message "ac-ts error %s" (error-message-string err))
+		   (setq ac-ts-tss-result 1)))))))
 
 (defun ac-ts-document (item)
   (if (stringp item)
@@ -169,7 +178,7 @@
 
 (defun ac-ts-candidate ()
   (when ac-ts-debug-mode
-	(message "ac-ts-candidate"))
+	(message "ac-ts-candidate '%s'" ac-prefix))
   (unless (ac-in-string/comment)
 	(let ((file-name (expand-file-name (buffer-file-name))))
 	  (prog1
