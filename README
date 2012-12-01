@@ -15,4 +15,4 @@ Auto Completion source for typescript for GNU Emacs
 (setq ac-ts-auto-save nil)
 (add-to-list 'ac-modes 'typescript-mode)
 
-(load "TypeScriptExt")
+(load "flymake-typescript")

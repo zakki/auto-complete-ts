@@ -61,7 +61,7 @@
 (defun ac-ts-ensure-tss (file-name)
   (unless (and ac-ts-tss-proc
 			   (member (process-status ac-ts-tss-proc) '(run stop)))
-	(let ((tss (expand-file-name (concat ac-ts-dir "/../typescript-tools/tss.js")))
+	(let ((tss (expand-file-name (concat ac-ts-dir "/../typescript-tools/bin/tss.js")))
 		  (f (expand-file-name file-name)))
 	  (when ac-ts-debug-mode
 		(message "tss:%s\nfile:%s" tss f))
