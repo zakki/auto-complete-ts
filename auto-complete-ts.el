@@ -71,12 +71,20 @@
 									  tss f))
 	  (set-process-filter ac-ts-tss-proc 'ac-ts-tss-proc-filter))))
 
+
+(defun ac-ts--wait-response ()
+  (let ((n 0)
+		(seconds 5))
+    (while (and (not ac-ts-tss-result) (<= n (* 10 seconds)))
+	  (setq n (+ 1 n))
+	  (sleep-for 0.1))))
+
 (defsubst ac-ts-build-location (file-name pos)
   (save-excursion
     (goto-char pos)
 	(format "%d %d %s"
 			(line-number-at-pos)
-			(1+ (- (point) (line-beginning-position)))
+			(- (point) (line-beginning-position))
 			(expand-file-name file-name))))
 
 (defsubst ac-ts-tss-query-command (file-name pos)
@@ -84,14 +92,24 @@
 
 (defsubst ac-ts-tss-update (file-name)
   (setq ac-ts-tss-result nil)
-  (let* ((cmd-json (list (cons "name" (expand-file-name file-name))
-						 (cons "content" (buffer-substring-no-properties (point-min) (point-max)))))
-		 (cmd (concat "update "
-					  (json-encode cmd-json)
-					  "\r\n")))
-	(process-send-string ac-ts-tss-proc cmd))
-  (while (not ac-ts-tss-result)
-	(sleep-for 0.1)))
+  (if ac-ts-auto-save
+	  (progn (buffer-modified-p)
+			 (basic-save-buffer)
+			 (process-send-string ac-ts-tss-proc "reload\r\n"))
+	(progn
+	  (let* ((contents (buffer-substring-no-properties (point-min) (point-max)))
+			 (lines (line-number-at-pos (point-max)))
+			 (cmd (format "update %d %s\r\n"
+						  lines file-name)))
+		(process-send-string ac-ts-tss-proc cmd)
+		(save-excursion
+		  (goto-char (point-min))
+		  (while (not (eobp))
+			; (message ">> %s" (buffer-substring-no-properties (point) (point-at-eol)))
+			(process-send-string ac-ts-tss-proc
+			 (concat (buffer-substring-no-properties (point) (point-at-eol)) "\r\n"))
+			(beginning-of-line 2))))))
+  (ac-ts--wait-response))
 
 (defun ac-ts-tss-proc-filter (proc string)
   ;; (when ac-ts-debug-mode
@@ -107,7 +125,7 @@
         (set-marker (process-mark proc) (point)))
       (if moving (goto-char (process-mark proc)))))
   (condition-case err
-	  (cond ((string-match "^\\(loaded\\|TSS\\) .*" string)
+	  (cond ((string-match "^\\(loaded\\|reloaded\\|updated\\|TSS\\) .*" string)
 			 (setq ac-ts-tss-result 1))
 			(t
 			 (setq ac-ts-tss-result (json-read-from-string string))))
@@ -153,16 +171,7 @@
   (when ac-ts-debug-mode
 	(message "ac-ts-candidate"))
   (unless (ac-in-string/comment)
-	(let (file-name)
-	  (if ac-ts-auto-save
-		  (progn (buffer-modified-p)
-				 (basic-save-buffer)
-				 (setq file-name buffer-file-name))
-		(let ((tmp-file (make-temp-file "auto-complete-ts")))
-		  (write-region (point-min) (point-max)
-						tmp-file
-						t 1)
-		  (setq file-name tmp-file)))
+	(let ((file-name (expand-file-name (buffer-file-name))))
 	  (prog1
 		  (save-restriction
 			(widen)
@@ -171,12 +180,10 @@
 			(setq ac-ts-tss-result nil)
 			(process-send-string ac-ts-tss-proc
 								 (ac-ts-tss-query-command file-name (- (point) (length ac-prefix))))
-			(while (not ac-ts-tss-result)
-			  (sleep-for 0.1))
+			(ac-ts--wait-response)
 			(if (listp ac-ts-tss-result)
 				(ac-ts--get-completions ac-ts-tss-result)
-			  nil))
-		(unless ac-ts-auto-save (delete-file file-name))))))
+			  nil))))))
 
 (defun ac-ts-prefix ()
   (or (ac-prefix-symbol)
