@@ -69,7 +69,12 @@
 									  "*ac-ts-tss*"
 									  ac-ts-node-executable
 									  tss f))
-	  (set-process-filter ac-ts-tss-proc 'ac-ts-tss-proc-filter))))
+	  (set-process-filter ac-ts-tss-proc 'ac-ts-tss-proc-filter)
+	  (add-hook 'kill-buffer-hook 'ac-ts--delete-process nil t))))
+
+(defun ac-ts--delete-process ()
+  (and ac-ts-tss-proc
+       (delete-process ac-ts-tss-proc)))
 
 (defun ac-ts--wait-response ()
   (let ((n 0)
