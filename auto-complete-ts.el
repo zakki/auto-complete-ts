@@ -81,7 +81,9 @@
 		(seconds 5))
     (while (and (not ac-ts-tss-result) (<= n (* 10 seconds)))
 	  (setq n (+ 1 n))
-	  (sleep-for 0.1))))
+	  (sleep-for 0.1))
+	(unless ac-ts-tss-result
+	  (message "tss timeout"))))
 
 (defun ac-ts-current-pos ()
   (format "%d %d"
@@ -96,8 +98,12 @@
 			(- (point) (line-beginning-position))
 			(expand-file-name file-name))))
 
-(defsubst ac-ts-tss-query-command (file-name pos)
-  (concat "info " (ac-ts-build-location file-name pos) "\r\n"))
+(defsubst ac-ts-tss-completions (file-name pos member)
+  (let ((cmd (format "completions %s %s\r\n"
+					 (if member "true" "false")
+					 (ac-ts-build-location file-name pos))))
+	(process-send-string ac-ts-tss-proc cmd)
+	(ac-ts--wait-response)))
 
 (defsubst ac-ts-tss-update (file-name)
   (setq ac-ts-tss-result nil)
@@ -171,8 +177,7 @@
   (nth 8 (syntax-ppss)))
 
 (defun ac-ts--get-completions (info)
-  (let* ((member (cdr (assoc 'completions info)))
-		 (member-entries (cdr (assoc 'entries member))))
+  (let ((member-entries (cdr (assoc 'entries info))))
 	(mapcar (lambda (ent)
 			  (let ((name (cdr (assoc 'name ent)))
 					(kind (cdr (assoc 'kind ent)))
@@ -192,9 +197,9 @@
 			(ac-ts-ensure-tss file-name)
 			(ac-ts-tss-update file-name)
 			(setq ac-ts-tss-result nil)
-			(process-send-string ac-ts-tss-proc
-								 (ac-ts-tss-query-command file-name (- (point) (length ac-prefix))))
-			(ac-ts--wait-response)
+			(ac-ts-tss-completions file-name
+								   (- (point) (length ac-prefix))
+								   (eq  ?\. (char-before ac-point)))
 			(if (listp ac-ts-tss-result)
 				(ac-ts--get-completions ac-ts-tss-result)
 			  nil))))))

@@ -6,7 +6,13 @@ Auto Completion source for typescript for GNU Emacs
 (add-to-list 'load-path "~/ts/emacs")
 (load "TypeScript")
 (add-to-list 'auto-mode-alist '("\\.ts" . typescript-mode))
+
+(require 'auto-complete-ts)
 (defun my-ac-ts-mode-setup ()
   (setq ac-sources '(ac-source-ts)))
 (add-hook 'typescript-mode-hook 'my-ac-ts-mode-setup)
 (setq ac-ts-lib-dir "~/ts/typescript/typings/")
+(setq ac-ts-auto-save nil)
+(add-to-list 'ac-modes 'typescript-mode)
+
+(load "TypeScriptExt")
