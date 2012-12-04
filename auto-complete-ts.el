@@ -186,6 +186,11 @@
 							(concat kind ":" type))))
 			member-entries)))
 
+(defun typescript-tss-prepare ()
+  (let ((file-name (expand-file-name (buffer-file-name))))
+	(ac-ts-ensure-tss file-name)
+	(ac-ts-tss-update file-name)))
+
 (defun ac-ts-candidate ()
   (when ac-ts-debug-mode
 	(message "ac-ts-candidate '%s'" ac-prefix))
@@ -194,8 +199,7 @@
 	  (prog1
 		  (save-restriction
 			(widen)
-			(ac-ts-ensure-tss file-name)
-			(ac-ts-tss-update file-name)
+			(typescript-tss-prepare)
 			(setq ac-ts-tss-result nil)
 			(ac-ts-tss-completions file-name
 								   (- (point) (length ac-prefix))
