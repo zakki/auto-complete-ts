@@ -191,6 +191,29 @@
 	(ac-ts-ensure-tss file-name)
 	(ac-ts-tss-update file-name)))
 
+
+(defun typescript-tss-default-command (cmd)
+  (typescript-tss-prepare)
+  (setq ac-ts-tss-result nil)
+  (let* ((file-name (expand-file-name (buffer-file-name)))
+		 (pos (ac-ts-build-location file-name (+ (point) 1)))
+		 (str (format "%s %s\r\n" cmd pos)))
+	(process-send-string ac-ts-tss-proc str)
+	(ac-ts--wait-response)
+	(message "%s" ac-ts-tss-result)))
+
+(defun typescript-tss-type ()
+  (interactive)
+  (typescript-tss-default-command "type"))
+
+(defun typescript-tss-symbol ()
+  (interactive)
+  (typescript-tss-default-command "symbol"))
+
+(defun typescript-tss-definition ()
+  (interactive)
+  (typescript-tss-default-command "definition"))
+
 (defun ac-ts-candidate ()
   (when ac-ts-debug-mode
 	(message "ac-ts-candidate '%s'" ac-prefix))

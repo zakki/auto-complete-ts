@@ -9,10 +9,12 @@ Auto Completion source for typescript for GNU Emacs
 
 (require 'auto-complete-ts)
 (defun my-ac-ts-mode-setup ()
+  (local-set-key "\C-ct" 'typescript-tss-type)
   (setq ac-sources '(ac-source-ts)))
 (add-hook 'typescript-mode-hook 'my-ac-ts-mode-setup)
 (setq ac-ts-lib-dir "~/ts/typescript/typings/")
 (setq ac-ts-auto-save nil)
+(global-set-key (kbd "C-c t") 'ac-ts-tss-type)
 (add-to-list 'ac-modes 'typescript-mode)
 
 (load "flymake-typescript")
