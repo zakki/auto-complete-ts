@@ -4,8 +4,9 @@
 (defun flymake-typescript-make-error (obj)
   (mapcar (lambda (ent)
 			(let* ((file (cdr (assoc 'file ent)))
-				   (line (cdr (assoc 'line1 ent)))
-				   (col (cdr (assoc 'col1 ent)))
+				   (start (cdr (assoc 'start ent)))
+				   (line (cdr (assoc 'line start)))
+				   (col (cdr (assoc 'col start)))
 				   (text (cdr (assoc 'text ent))))
 			  (format "%s (%d,%d): %s" file line col text)))
 		  obj))
@@ -13,20 +14,20 @@
 (defun flymake-typescript-check-error ()
   "Show syntax errors."
   (interactive)
-  (when ac-ts-debug-mode
+  (when typescript-tss-debug-mode
 	(message "flymake-typescript-check-error"))
   (let ((file-name (expand-file-name (buffer-file-name))))
 	(setq flymake-last-change-time nil)
 	(save-restriction
 	  (setq flymake-check-start-time (flymake-float-time))
 	  (widen)
-	  (ac-ts-ensure-tss file-name)
-	  (ac-ts-tss-update file-name)
-	  (setq ac-ts-tss-result nil)
-	  (process-send-string ac-ts-tss-proc "showErrors\r\n")
-	  (ac-ts--wait-response)
-	  (when (arrayp ac-ts-tss-result)
-		(let ((lines (flymake-typescript-make-error ac-ts-tss-result)))
+	  (typescript-tss-ensure-tss file-name)
+	  (typescript-tss-update file-name)
+	  (setq typescript-tss-result nil)
+	  (process-send-string typescript-tss-proc "showErrors\r\n")
+	  (typescript-tss--wait-response)
+	  (when (arrayp typescript-tss-result)
+		(let ((lines (flymake-typescript-make-error typescript-tss-result)))
 		  (setq flymake-new-err-info
 				(flymake-parse-err-lines
 				 flymake-new-err-info lines)))

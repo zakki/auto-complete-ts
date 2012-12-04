@@ -23,136 +23,9 @@
 (provide 'auto-complete-ts)
 (require 'auto-complete)
 (require 'json)
-
-(defcustom ac-ts-node-executable
-  (executable-find "node")
-  "*Location of node.js executable"
-  :group 'auto-complete
-  :type 'file)
-
-(defcustom ac-ts-lib-dir
-  nil
-  "*Location of typing files (*.d.ts) directory."
-  :group 'auto-complete
-  :type 'file)
-
-(defcustom ac-ts-auto-save t
-  "*Determines whether to save the buffer when retrieving completions."
-  :group 'auto-complete
-  :type '(choice (const :tag "Off" nil)
-                 (const :tag "On" t)))
-
-(defcustom ac-ts-lang-option-function nil
-  "*function to return the lang type for option -x."
-  :group 'auto-complete
-  :type 'function)
-
-(defconst ac-ts-error-buffer-name "*ts error*")
-
-(defvar ac-ts-dir (file-name-directory load-file-name)
-  "The root dir of the auto-complete-ts distribution.")
+(require 'typescript-tss)
 
 (defvar ac-ts-debug-mode nil)
-
-;; connect to typescript-tools
-(defvar ac-ts-tss-proc nil)
-(defvar ac-ts-tss-result nil)
-
-(defun ac-ts-ensure-tss (file-name)
-  (unless (and ac-ts-tss-proc
-			   (member (process-status ac-ts-tss-proc) '(run stop)))
-	(let ((tss (expand-file-name (concat ac-ts-dir "/../typescript-tools/bin/tss.js")))
-		  (f (expand-file-name file-name)))
-	  (when ac-ts-debug-mode
-		(message "tss:%s\nfile:%s" tss f))
-	  (setq ac-ts-tss-proc (start-process "node tss.js"
-									  "*ac-ts-tss*"
-									  ac-ts-node-executable
-									  tss f))
-	  (set-process-filter ac-ts-tss-proc 'ac-ts-tss-proc-filter)
-	  (add-hook 'kill-buffer-hook 'ac-ts--delete-process nil t))))
-
-(defun ac-ts--delete-process ()
-  (and ac-ts-tss-proc
-       (delete-process ac-ts-tss-proc)))
-
-(defun ac-ts--wait-response ()
-  (let ((n 0)
-		(seconds 5))
-    (while (and (not ac-ts-tss-result) (<= n (* 10 seconds)))
-	  (setq n (+ 1 n))
-	  (sleep-for 0.1))
-	(unless ac-ts-tss-result
-	  (message "tss timeout"))))
-
-(defun ac-ts-current-pos ()
-  (format "%d %d"
-		  (line-number-at-pos)
-		  (- (point) (line-beginning-position))))
-
-(defsubst ac-ts-build-location (file-name pos)
-  (save-excursion
-    (goto-char pos)
-	(format "%d %d %s"
-			(line-number-at-pos)
-			(- (point) (line-beginning-position))
-			(expand-file-name file-name))))
-
-(defsubst ac-ts-tss-completions (file-name pos member)
-  (let ((cmd (format "completions %s %s\r\n"
-					 (if member "true" "false")
-					 (ac-ts-build-location file-name pos))))
-	(process-send-string ac-ts-tss-proc cmd)
-	(ac-ts--wait-response)))
-
-(defsubst ac-ts-tss-update (file-name)
-  (setq ac-ts-tss-result nil)
-  (if ac-ts-auto-save
-	  (progn (buffer-modified-p)
-			 (basic-save-buffer)
-			 (process-send-string ac-ts-tss-proc "reload\r\n"))
-	(progn
-	  (let* ((contents (buffer-substring-no-properties (point-min) (point-max)))
-			 (lines (line-number-at-pos (point-max)))
-			 (cmd (format "update %d %s\r\n"
-						  lines file-name)))
-		(process-send-string ac-ts-tss-proc cmd)
-		(save-excursion
-		  (goto-char (point-min))
-		  (while (not (eobp))
-			; (message ">> %s" (buffer-substring-no-properties (point) (point-at-eol)))
-			(process-send-string ac-ts-tss-proc
-			 (concat (buffer-substring-no-properties (point) (point-at-eol)) "\r\n"))
-			(beginning-of-line 2))))))
-  (ac-ts--wait-response))
-
-(defun ac-ts-tss-proc-filter (proc string)
-  ;; (when ac-ts-debug-mode
-  ;; 	(message "ac-ts-tss-proc-filter %s %d"
-  ;; 			 (string  )
-  ;; 			 (length string)))
-  (let ((line))
-	(with-current-buffer (process-buffer proc)
-	  (let ((moving (= (point) (process-mark proc))))
-		(save-excursion
-		  ;; Insert the text, advancing the process marker.
-		  (goto-char (process-mark proc))
-		  (insert string)
-		  (set-marker (process-mark proc) (point))
-		  (when (= (point) (line-beginning-position))
-			(beginning-of-line 0)
-			(setq line (buffer-substring-no-properties (point) (point-at-eol)))))
-		(if moving (goto-char (process-mark proc)))))
-	(when line
-	  (condition-case err
-		  (cond ((string-match "^\\(loaded\\|reloaded\\|updated\\|TSS\\) .*" line)
-				 (setq ac-ts-tss-result 1))
-				(t
-				 (setq ac-ts-tss-result (json-read-from-string line))))
-		(json-error
-		 (progn
-		   (message "ac-ts error %s" (error-message-string err))
-		   (setq ac-ts-tss-result 1)))))))
 
 (defun ac-ts-document (item)
   (if (stringp item)
@@ -186,34 +59,6 @@
 							(concat kind ":" type))))
 			member-entries)))
 
-(defun typescript-tss-prepare ()
-  (let ((file-name (expand-file-name (buffer-file-name))))
-	(ac-ts-ensure-tss file-name)
-	(ac-ts-tss-update file-name)))
-
-
-(defun typescript-tss-default-command (cmd)
-  (typescript-tss-prepare)
-  (setq ac-ts-tss-result nil)
-  (let* ((file-name (expand-file-name (buffer-file-name)))
-		 (pos (ac-ts-build-location file-name (+ (point) 1)))
-		 (str (format "%s %s\r\n" cmd pos)))
-	(process-send-string ac-ts-tss-proc str)
-	(ac-ts--wait-response)
-	(message "%s" ac-ts-tss-result)))
-
-(defun typescript-tss-type ()
-  (interactive)
-  (typescript-tss-default-command "type"))
-
-(defun typescript-tss-symbol ()
-  (interactive)
-  (typescript-tss-default-command "symbol"))
-
-(defun typescript-tss-definition ()
-  (interactive)
-  (typescript-tss-default-command "definition"))
-
 (defun ac-ts-candidate ()
   (when ac-ts-debug-mode
 	(message "ac-ts-candidate '%s'" ac-prefix))
@@ -223,12 +68,12 @@
 		  (save-restriction
 			(widen)
 			(typescript-tss-prepare)
-			(setq ac-ts-tss-result nil)
-			(ac-ts-tss-completions file-name
-								   (- (point) (length ac-prefix))
-								   (eq  ?\. (char-before ac-point)))
-			(if (listp ac-ts-tss-result)
-				(ac-ts--get-completions ac-ts-tss-result)
+			(setq typescript-tss-result nil)
+			(typescript-tss-completions file-name
+										(- (point) (length ac-prefix))
+										(eq  ?\. (char-before ac-point)))
+			(if (listp typescript-tss-result)
+				(ac-ts--get-completions typescript-tss-result)
 			  nil))))))
 
 (defun ac-ts-prefix ()
