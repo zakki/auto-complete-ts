@@ -59,7 +59,7 @@
 									  "*typescript-tss*"
 									  typescript-tss-node-executable
 									  tss f))
-	  (set-process-filter typescript-tss-proc 'typescript-tss-proc-filter)
+	  (set-process-filter typescript-tss-proc 'typescript-tss--proc-filter)
 	  (add-hook 'kill-buffer-hook 'typescript-tss--delete-process nil t))))
 
 (defun typescript-tss--delete-process ()
@@ -68,59 +68,14 @@
 
 (defun typescript-tss--wait-response ()
   (let ((n 0)
-		(seconds 5))
+		(seconds 10))
     (while (and (not typescript-tss-result) (<= n (* 10 seconds)))
 	  (setq n (+ 1 n))
 	  (sleep-for 0.1))
 	(unless typescript-tss-result
 	  (message "tss timeout"))))
 
-(defun typescript-tss-current-pos ()
-  (format "%d %d"
-		  (line-number-at-pos)
-		  (- (point) (line-beginning-position))))
-
-(defsubst typescript-tss-build-location (file-name pos)
-  (save-excursion
-    (goto-char pos)
-	(format "%d %d %s"
-			(line-number-at-pos)
-			(- (point) (line-beginning-position))
-			(expand-file-name file-name))))
-
-(defsubst typescript-tss-completions (file-name pos member)
-  (let ((cmd (format "completions %s %s\r\n"
-					 (if member "true" "false")
-					 (typescript-tss-build-location file-name pos))))
-	(process-send-string typescript-tss-proc cmd)
-	(typescript-tss--wait-response)))
-
-(defsubst typescript-tss-update (file-name)
-  (setq typescript-tss-result nil)
-  (if typescript-tss-auto-save
-	  (progn (buffer-modified-p)
-			 (basic-save-buffer)
-			 (process-send-string typescript-tss-proc "reload\r\n"))
-	(progn
-	  (let* ((contents (buffer-substring-no-properties (point-min) (point-max)))
-			 (lines (line-number-at-pos (point-max)))
-			 (cmd (format "update %d %s\r\n"
-						  lines file-name)))
-		(process-send-string typescript-tss-proc cmd)
-		(save-excursion
-		  (goto-char (point-min))
-		  (while (not (eobp))
-										; (message ">> %s" (buffer-substring-no-properties (point) (point-at-eol)))
-			(process-send-string typescript-tss-proc
-								 (concat (buffer-substring-no-properties (point) (point-at-eol)) "\r\n"))
-			(beginning-of-line 2))))))
-  (typescript-tss--wait-response))
-
-(defun typescript-tss-proc-filter (proc string)
-  ;; (when typescript-tss-debug-mode
-  ;; 	(message "typescript-tss-proc-filter %s %d"
-  ;; 			 (string  )
-  ;; 			 (length string)))
+(defun typescript-tss--proc-filter (proc string)
   (let ((line))
 	(with-current-buffer (process-buffer proc)
 	  (let ((moving (= (point) (process-mark proc))))
@@ -144,10 +99,63 @@
 		   (message "typescript-tss error %s" (error-message-string err))
 		   (setq typescript-tss-result 1)))))))
 
+(defun typescript-tss-current-pos ()
+  (format "%d %d"
+		  (line-number-at-pos)
+		  (- (point) (line-beginning-position))))
+
+(defsubst typescript-tss-build-location (file-name pos)
+  (save-excursion
+    (goto-char pos)
+	(format "%d %d %s"
+			(line-number-at-pos)
+			(- (point) (line-beginning-position))
+			(expand-file-name file-name))))
+
+(defun typescript-tss-update (file-name)
+  (setq typescript-tss-result nil)
+  (if typescript-tss-auto-save
+	  (progn (buffer-modified-p)
+			 (basic-save-buffer)
+			 (process-send-string typescript-tss-proc "reload\r\n"))
+	(progn
+	  (let* ((contents (buffer-substring-no-properties (point-min) (point-max)))
+			 (lines (line-number-at-pos (point-max)))
+			 (cmd (format "update %d %s\r\n"
+						  lines file-name)))
+		(when typescript-tss-debug-mode
+		  (message "tss update source:%s" cmd))
+		(process-send-string typescript-tss-proc cmd)
+		(save-excursion
+		  (goto-char (point-min))
+		  (while (not (eobp))
+;			(message ">> %s" (buffer-substring-no-properties (point) (point-at-eol)))
+			(process-send-string typescript-tss-proc
+								 (concat (buffer-substring-no-properties (point) (point-at-eol)) "\n"))
+			(beginning-of-line 2))))))
+  (typescript-tss--wait-response))
+
 (defun typescript-tss-prepare ()
   (let ((file-name (expand-file-name (buffer-file-name))))
 	(typescript-tss-ensure-tss file-name)
 	(typescript-tss-update file-name)))
+
+(defun typescript-tss-completions (file-name pos member)
+  (typescript-tss-prepare)
+  (setq typescript-tss-result nil)
+  (let ((cmd (format "completions %s %s\r\n"
+					 (if member "true" "false")
+					 (typescript-tss-build-location file-name pos))))
+	(process-send-string typescript-tss-proc cmd)
+	(typescript-tss--wait-response)
+	typescript-tss-result))
+
+(defun typescript-tss-errors ()
+  (typescript-tss-prepare)
+  (setq typescript-tss-result nil)
+  (process-send-string typescript-tss-proc "showErrors\r\n")
+  (typescript-tss--wait-response)
+  typescript-tss-result)
 
 (defun typescript-tss-default-command (cmd)
   (typescript-tss-prepare)

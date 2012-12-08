@@ -67,14 +67,13 @@
 	  (prog1
 		  (save-restriction
 			(widen)
-			(typescript-tss-prepare)
-			(setq typescript-tss-result nil)
-			(typescript-tss-completions file-name
-										(- (point) (length ac-prefix))
-										(eq  ?\. (char-before ac-point)))
-			(if (listp typescript-tss-result)
-				(ac-ts--get-completions typescript-tss-result)
-			  nil))))))
+			(let* ((point (- (point) (length ac-prefix)))
+				   (member (eq  ?\. (char-before ac-point)))
+				   (result (typescript-tss-completions file-name
+													   point member)))
+			  (if (listp result)
+				  (ac-ts--get-completions result)
+				nil)))))))
 
 (defun ac-ts-prefix ()
   (or (ac-prefix-symbol)

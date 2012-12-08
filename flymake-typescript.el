@@ -21,20 +21,16 @@
 	(save-restriction
 	  (setq flymake-check-start-time (flymake-float-time))
 	  (widen)
-	  (typescript-tss-ensure-tss file-name)
-	  (typescript-tss-update file-name)
-	  (setq typescript-tss-result nil)
-	  (process-send-string typescript-tss-proc "showErrors\r\n")
-	  (typescript-tss--wait-response)
-	  (when (arrayp typescript-tss-result)
-		(let ((lines (flymake-typescript-make-error typescript-tss-result)))
-		  (setq flymake-new-err-info
-				(flymake-parse-err-lines
-				 flymake-new-err-info lines)))
+	  (let ((result (typescript-tss-errors)))
+		(when (arrayp result)
+		  (let ((lines (flymake-typescript-make-error result)))
+			(setq flymake-new-err-info
+				  (flymake-parse-err-lines
+				   flymake-new-err-info lines)))
 		  ;; (message "lines %s" lines)
 		  ;; (message "new err %s" flymake-new-err-info))
-		(flymake-post-syntax-check 0 "tss")
-        (setq flymake-is-running nil)))))
+		  (flymake-post-syntax-check 0 "tss")
+		  (setq flymake-is-running nil))))))
 
 (when (load "flymake" t)  
   (defun flymake-typescript-init ()
