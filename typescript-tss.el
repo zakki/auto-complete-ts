@@ -178,3 +178,16 @@
 (defun typescript-tss-show-definition ()
   (interactive)
   (message "Definition: %s" (typescript-tss-default-command "definition")))
+
+(defun typescript-tss-goto-definition ()
+  (interactive)
+  (let ((def (typescript-tss-default-command "definition")))
+	(if def
+	  (let* ((file (cdr (assoc 'file def)))
+			 (min (cdr (assoc 'min def)))
+			 (l (elt min 0))
+			 (c (elt min 1)))
+		(find-file file)
+		(goto-line l)
+		(beginning-of-line))
+	  (message "Not found"))))
