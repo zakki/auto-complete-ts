@@ -44,7 +44,9 @@
 
 ;; connect to typescript-tools
 (defvar typescript-tss-proc nil)
+(make-variable-buffer-local 'typescript-tss-proc)
 (defvar typescript-tss-result nil)
+(make-variable-buffer-local 'typescript-tss-result)
 
 (defun typescript-tss-ensure-tss (file-name)
   (unless (and typescript-tss-proc
