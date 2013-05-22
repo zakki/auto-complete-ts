@@ -23,9 +23,9 @@
 (provide 'typescript-tss)
 (require 'json)
 
-(defcustom typescript-tss-node-executable
-  (executable-find "node")
-  "*Location of node.js executable"
+(defcustom typescript-tss-executable
+  (executable-find "tss")
+  "*Location of tss executable"
   :group 'auto-complete
   :type 'file)
 
@@ -34,9 +34,6 @@
   :group 'auto-complete
   :type '(choice (const :tag "Off" nil)
                  (const :tag "On" t)))
-
-(defvar typescript-tss-dir (file-name-directory load-file-name)
-  "The root dir of the auto-complete-ts distribution.")
 
 (defvar typescript-tss-debug-mode nil)
 
@@ -53,14 +50,13 @@
 (defun typescript-tss-ensure-tss (file-name)
   (unless (and typescript-tss-proc
 			   (member (process-status typescript-tss-proc) '(run stop)))
-	(let ((tss (expand-file-name (concat typescript-tss-dir "/../typescript-tools/bin/tss.js")))
-		  (f (expand-file-name file-name)))
+	(let ((f (expand-file-name file-name)))
 	  (when typescript-tss-debug-mode
 		(message "tss:%s\nfile:%s" tss f))
-	  (setq typescript-tss-proc (start-process "node tss.js"
+	  (setq typescript-tss-proc (start-process "tss"
 									  "*typescript-tss*"
-									  typescript-tss-node-executable
-									  tss f))
+									  typescript-tss-executable
+									  f))
 	  (set-process-filter typescript-tss-proc 'typescript-tss--proc-filter)
 	  (add-hook 'kill-buffer-hook 'typescript-tss--delete-process nil t))))
 
