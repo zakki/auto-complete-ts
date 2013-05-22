@@ -40,6 +40,8 @@
 
 (defvar typescript-tss-debug-mode nil)
 
+(defvar typescript-tss-line-separator "\n")
+
 (defconst typescript-tss-error-buffer-name "*tss error*")
 
 ;; connect to typescript-tools
@@ -77,6 +79,8 @@
 
 (defun typescript-tss--proc-filter (proc string)
   (let ((line))
+	(when typescript-tss-debug-mode
+	  (message "tss:proc-filter %s"  string))
 	(with-current-buffer (process-buffer proc)
 	  (let ((moving (= (point) (process-mark proc))))
 		(save-excursion
@@ -89,6 +93,8 @@
 			(setq line (buffer-substring-no-properties (point) (point-at-eol)))))
 		(if moving (goto-char (process-mark proc)))))
 	(when line
+	  (when typescript-tss-debug-mode
+		(message "tss:parse %s" line))
 	  (condition-case err
 		  (cond ((string-match "^\\(loaded\\|reloaded\\|updated\\|TSS\\) .*" line)
 				 (setq typescript-tss-result 1))
@@ -117,12 +123,15 @@
   (if typescript-tss-auto-save
 	  (progn (buffer-modified-p)
 			 (basic-save-buffer)
-			 (process-send-string typescript-tss-proc "reload\r\n"))
+			 (process-send-string typescript-tss-proc
+								  (concat "reload"
+										  typescript-tss-line-separator)))
 	(progn
 	  (let* ((contents (buffer-substring-no-properties (point-min) (point-max)))
 			 (lines (line-number-at-pos (point-max)))
-			 (cmd (format "update %d %s\r\n"
-						  lines file-name)))
+			 (cmd (format "update %d %s%s"
+						  lines file-name
+						  typescript-tss-line-separator)))
 		(when typescript-tss-debug-mode
 		  (message "tss update source:%s" cmd))
 		(process-send-string typescript-tss-proc cmd)
@@ -131,7 +140,8 @@
 		  (while (not (eobp))
 ;			(message ">> %s" (buffer-substring-no-properties (point) (point-at-eol)))
 			(process-send-string typescript-tss-proc
-								 (concat (buffer-substring-no-properties (point) (point-at-eol)) "\n"))
+								 (concat (buffer-substring-no-properties (point) (point-at-eol))
+										 typescript-tss-line-separator))
 			(beginning-of-line 2))))))
   (typescript-tss--wait-response))
 
@@ -143,9 +153,10 @@
 (defun typescript-tss-completions (file-name pos member)
   (typescript-tss-prepare)
   (setq typescript-tss-result nil)
-  (let ((cmd (format "completions %s %s\r\n"
+  (let ((cmd (format "completions %s %s%s"
 					 (if member "true" "false")
-					 (typescript-tss-build-location file-name pos))))
+					 (typescript-tss-build-location file-name pos)
+					 typescript-tss-line-separator)))
 	(process-send-string typescript-tss-proc cmd)
 	(typescript-tss--wait-response)
 	typescript-tss-result))
@@ -153,7 +164,9 @@
 (defun typescript-tss-errors ()
   (typescript-tss-prepare)
   (setq typescript-tss-result nil)
-  (process-send-string typescript-tss-proc "showErrors\r\n")
+  (process-send-string typescript-tss-proc
+					   (concat "showErrors"
+							   typescript-tss-line-separator))
   (typescript-tss--wait-response)
   typescript-tss-result)
 
@@ -162,7 +175,7 @@
   (setq typescript-tss-result nil)
   (let* ((file-name (expand-file-name (buffer-file-name)))
 		 (pos (typescript-tss-build-location file-name (+ (point) 1)))
-		 (str (format "%s %s\r\n" cmd pos)))
+		 (str (format "%s %s%s" cmd pos typescript-tss-line-separator)))
 	(process-send-string typescript-tss-proc str)
 	(typescript-tss--wait-response)
 	typescript-tss-result))
